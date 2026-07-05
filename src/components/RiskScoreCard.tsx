@@ -79,7 +79,7 @@ export default function RiskScoreCard({ stage, risk }: RiskScoreCardProps) {
         {risk.factors.map((factor) => (
           <div
             key={factor.key}
-            className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5 text-[13px] ${
+            className={`flex flex-col items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px] sm:flex-row sm:justify-between sm:gap-3 ${
               factor.triggered
                 ? 'border-signal-high/20 bg-signal-high/5'
                 : 'border-base-border bg-base-surface2/40'

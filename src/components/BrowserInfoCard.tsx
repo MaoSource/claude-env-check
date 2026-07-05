@@ -36,7 +36,7 @@ export default function BrowserInfoCard({ stage, browser, ip }: BrowserInfoCardP
       <div className="mt-3">
         <div className="kv-row">
           <span className="kv-label">User-Agent</span>
-          <span className="kv-value max-w-[65%]">{browser.userAgent}</span>
+          <span className="kv-value">{browser.userAgent}</span>
         </div>
         <div className="kv-row">
           <span className="kv-label">系统 / 浏览器语言</span>

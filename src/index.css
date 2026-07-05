@@ -5,9 +5,11 @@
 @layer base {
   html {
     @apply bg-base-bg;
+    overflow-x: hidden;
   }
   body {
     @apply bg-base-bg text-ink-primary font-body antialiased;
+    overflow-x: hidden;
   }
   ::selection {
     @apply bg-signal-cyan/30 text-ink-primary;
@@ -16,7 +18,7 @@
 
 @layer components {
   .panel {
-    @apply relative rounded-2xl border border-base-border bg-base-surface;
+    @apply relative min-w-0 rounded-2xl border border-base-border bg-base-surface;
   }
 
   .panel-scan::before {
@@ -25,15 +27,17 @@
   }
 
   .kv-row {
-    @apply flex items-start justify-between gap-4 border-b border-base-border/70 py-2.5 last:border-none;
+    @apply flex min-w-0 flex-col items-stretch gap-1.5 border-b border-base-border/70 py-2.5 last:border-none sm:flex-row sm:items-start sm:justify-between sm:gap-4;
   }
 
   .kv-label {
-    @apply shrink-0 text-[13px] text-ink-secondary;
+    @apply text-[13px] text-ink-secondary sm:shrink-0;
   }
 
   .kv-value {
-    @apply font-mono text-[13px] text-ink-primary text-right break-all;
+    @apply w-full min-w-0 font-mono text-[13px] text-ink-primary text-left sm:max-w-[68%] sm:text-right;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .eyebrow {
