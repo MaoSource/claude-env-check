@@ -29,6 +29,10 @@ function extractLanguageRegion(languageTag: string): string {
   return parts.find((part, index) => index > 0 && (/^[A-Z]{2}$/.test(part) || /^\d{3}$/.test(part))) || ''
 }
 
+function normalizeIp(ipAddress: string): string {
+  return ipAddress.trim().toLowerCase()
+}
+
 export function evaluateRisk({ ip, browser, distinctCountriesRecently }: ScoreEvalInput): RiskResult {
   const factors: RiskFactor[] = []
   let score = 0
@@ -62,17 +66,18 @@ export function evaluateRisk({ ip, browser, distinctCountriesRecently }: ScoreEv
   })
 
   // 3. 国家频繁变化（基于本机浏览器最近 7 天的本地记录）
-  const countrySwitchTriggered = distinctCountriesRecently >= 3
-  if (countrySwitchTriggered) {
+  const countrySwitchHighRisk = distinctCountriesRecently >= 3
+  const countrySwitchLowRisk = distinctCountriesRecently === 2
+  if (countrySwitchHighRisk) {
     score += WEIGHTS.countrySwitching
-  } else if (distinctCountriesRecently === 2) {
+  } else if (countrySwitchLowRisk) {
     score += Math.round(WEIGHTS.countrySwitching / 2)
   }
   factors.push({
     key: 'countrySwitching',
     label: '近 7 天出口国家频繁变化',
-    level: 'high',
-    triggered: countrySwitchTriggered,
+    level: countrySwitchHighRisk ? 'high' : 'low',
+    triggered: countrySwitchHighRisk || countrySwitchLowRisk,
     detail:
       distinctCountriesRecently <= 1
         ? '本机近 7 天检测记录中出口国家保持一致。'
@@ -140,7 +145,13 @@ export function evaluateRisk({ ip, browser, distinctCountriesRecently }: ScoreEv
   })
 
   // 6. WebRTC 暴露额外 IP
-  const webrtcExposure = browser.webrtcChecked && !!browser.webrtcLocalIp
+  const webrtcDetectedIp = browser.webrtcChecked && !!browser.webrtcLocalIp
+  const webrtcIpIsOutletIp = !!(
+    browser.webrtcLocalIp &&
+    ip.ip &&
+    normalizeIp(browser.webrtcLocalIp) === normalizeIp(ip.ip)
+  )
+  const webrtcExposure = !!(webrtcDetectedIp && !webrtcIpIsOutletIp)
   const webrtcIpCountryCode = browser.webrtcIpInfo?.countryCode?.toUpperCase() || ''
   const webrtcMismatch = !!(webrtcExposure && webrtcIpCountryCode && outletCountryCode && webrtcIpCountryCode !== outletCountryCode)
 
@@ -161,6 +172,8 @@ export function evaluateRisk({ ip, browser, distinctCountriesRecently }: ScoreEv
       ? browser.webrtcIpInfo
         ? `检测到 WebRTC 候选地址中包含可识别 IP（${browser.webrtcLocalIp}），归属地为 ${browser.webrtcIpInfo.country || '未知'}（${browser.webrtcIpInfo.countryCode || '未知'}）。`
         : `检测到 WebRTC 候选地址中包含可识别 IP（${browser.webrtcLocalIp}），但归属地查询失败。`
+      : webrtcIpIsOutletIp
+      ? `WebRTC 仅返回当前出口 IP（${browser.webrtcLocalIp}），未检测到额外 IP。`
       : '未通过 WebRTC 检测到额外暴露的 IP 地址。'
   })
   factors.push({
