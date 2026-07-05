@@ -32,8 +32,9 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
 
 // --- 三个数据源的归一化适配器 ---
 
-async function fromIpwhoIs(): Promise<IpInfo> {
-  const res = await fetchWithTimeout('https://ipwho.is/', 6000)
+async function fromIpwhoIs(ipAddress?: string): Promise<IpInfo> {
+  const url = ipAddress ? `https://ipwho.is/${encodeURIComponent(ipAddress)}` : 'https://ipwho.is/'
+  const res = await fetchWithTimeout(url, 6000)
   if (!res.ok) throw new Error('ipwho.is 请求失败')
   const d = await res.json()
   if (d?.success === false) throw new Error('ipwho.is 返回失败')
@@ -56,8 +57,9 @@ async function fromIpwhoIs(): Promise<IpInfo> {
   }
 }
 
-async function fromIpapiCo(): Promise<IpInfo> {
-  const res = await fetchWithTimeout('https://ipapi.co/json/', 6000)
+async function fromIpapiCo(ipAddress?: string): Promise<IpInfo> {
+  const url = ipAddress ? `https://ipapi.co/${encodeURIComponent(ipAddress)}/json/` : 'https://ipapi.co/json/'
+  const res = await fetchWithTimeout(url, 6000)
   if (!res.ok) throw new Error('ipapi.co 请求失败')
   const d = await res.json()
   if (d?.error) throw new Error(d?.reason || 'ipapi.co 返回失败')
@@ -80,8 +82,9 @@ async function fromIpapiCo(): Promise<IpInfo> {
   }
 }
 
-async function fromIpinfoIo(): Promise<IpInfo> {
-  const res = await fetchWithTimeout('https://ipinfo.io/json', 6000)
+async function fromIpinfoIo(ipAddress?: string): Promise<IpInfo> {
+  const url = ipAddress ? `https://ipinfo.io/${encodeURIComponent(ipAddress)}/json` : 'https://ipinfo.io/json'
+  const res = await fetchWithTimeout(url, 6000)
   if (!res.ok) throw new Error('ipinfo.io 请求失败')
   const d = await res.json()
 
@@ -103,13 +106,13 @@ async function fromIpinfoIo(): Promise<IpInfo> {
 }
 
 // 依次尝试三个来源，全部失败则抛出错误，由上层 UI 呈现兜底文案
-export async function resolveIpInfo(): Promise<IpInfo> {
+export async function resolveIpInfo(ipAddress?: string): Promise<IpInfo> {
   const providers = [fromIpwhoIs, fromIpapiCo, fromIpinfoIo]
   let lastError: unknown = null
 
   for (const provider of providers) {
     try {
-      return await provider()
+      return await provider(ipAddress)
     } catch (err) {
       lastError = err
     }

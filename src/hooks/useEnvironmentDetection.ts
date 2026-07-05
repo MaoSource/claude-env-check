@@ -5,7 +5,10 @@ import { detectWebrtcLeak } from '../utils/webrtc'
 import { recordAndCountCountrySwitches } from '../utils/countryHistory'
 import { evaluateRisk } from '../utils/risk'
 
-function collectStaticBrowserInfo(): Omit<BrowserInfo, 'webrtcLocalIp' | 'webrtcChecked' | 'webrtcSupported'> {
+function collectStaticBrowserInfo(): Omit<
+  BrowserInfo,
+  'webrtcLocalIp' | 'webrtcIpInfo' | 'webrtcIpLookupError' | 'webrtcChecked' | 'webrtcSupported'
+> {
   const tzOptions = Intl.DateTimeFormat().resolvedOptions()
   return {
     userAgent: navigator.userAgent,
@@ -58,23 +61,55 @@ export function useEnvironmentDetection(): DetectionState {
       if (ipResult.status === 'rejected') {
         setStage('error')
         setErrorMessage('IP 信息查询失败：所有数据源均无响应，请检查网络后重试。')
+        const webrtcLocalIp = webrtcResult.status === 'fulfilled' ? webrtcResult.value.localIp : null
+        let webrtcIpInfo: IpInfo | null = null
+        let webrtcIpLookupError: string | null = null
+
+        if (webrtcLocalIp) {
+          try {
+            webrtcIpInfo = await resolveIpInfo(webrtcLocalIp)
+          } catch {
+            webrtcIpLookupError = 'WebRTC IP 归属地查询失败'
+          }
+        }
+
+        if (cancelled) return
+
         // 浏览器信息不依赖 IP，依然展示
         const fallbackBrowser: BrowserInfo = {
           ...staticBrowser,
           webrtcChecked: webrtcResult.status === 'fulfilled',
           webrtcSupported: webrtcResult.status === 'fulfilled' ? webrtcResult.value.supported : false,
-          webrtcLocalIp: webrtcResult.status === 'fulfilled' ? webrtcResult.value.localIp : null
+          webrtcLocalIp,
+          webrtcIpInfo,
+          webrtcIpLookupError
         }
         setBrowser(fallbackBrowser)
         return
       }
 
       const ipInfo = ipResult.value
+      const webrtcLocalIp = webrtcResult.status === 'fulfilled' ? webrtcResult.value.localIp : null
+      let webrtcIpInfo: IpInfo | null = null
+      let webrtcIpLookupError: string | null = null
+
+      if (webrtcLocalIp) {
+        try {
+          webrtcIpInfo = await resolveIpInfo(webrtcLocalIp)
+        } catch {
+          webrtcIpLookupError = 'WebRTC IP 归属地查询失败'
+        }
+      }
+
+      if (cancelled) return
+
       const browserInfo: BrowserInfo = {
         ...staticBrowser,
         webrtcChecked: webrtcResult.status === 'fulfilled',
         webrtcSupported: webrtcResult.status === 'fulfilled' ? webrtcResult.value.supported : false,
-        webrtcLocalIp: webrtcResult.status === 'fulfilled' ? webrtcResult.value.localIp : null
+        webrtcLocalIp,
+        webrtcIpInfo,
+        webrtcIpLookupError
       }
 
       const countryCount = recordAndCountCountrySwitches(ipInfo.countryCode)

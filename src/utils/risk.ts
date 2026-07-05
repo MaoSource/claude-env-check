@@ -14,13 +14,19 @@ const WEIGHTS = {
   countrySwitching: 25,
   timezoneMismatch: 18,
   languageMismatch: 10,
-  webrtcLeak: 18
+  webrtcExposure: 6,
+  webrtcMismatch: 18
 }
 
 function levelFromScore(score: number): RiskLevel {
   if (score >= 45) return 'high'
   if (score >= 20) return 'mid'
   return 'low'
+}
+
+function extractLanguageRegion(languageTag: string): string {
+  const parts = languageTag.split('-').map((part) => part.trim().toUpperCase())
+  return parts.find((part, index) => index > 0 && (/^[A-Z]{2}$/.test(part) || /^\d{3}$/.test(part))) || ''
 }
 
 export function evaluateRisk({ ip, browser, distinctCountriesRecently }: ScoreEvalInput): RiskResult {
@@ -94,16 +100,33 @@ export function evaluateRisk({ ip, browser, distinctCountriesRecently }: ScoreEv
     detail: timezoneDetail
   })
 
+  const outletCountryCode = ip.countryCode?.toUpperCase() || ''
+
   // 5. 浏览器语言与 IP 地区是否一致
   const primaryLang = browser.systemLanguage || ''
-  const langRegion = primaryLang.includes('-') ? primaryLang.split('-')[1]?.toUpperCase() : ''
+  const primaryLangRegion = extractLanguageRegion(primaryLang)
+  const browserLanguageRegions = Array.from(
+    new Set(browser.browserLanguages.map(extractLanguageRegion).filter(Boolean))
+  )
+  const hasLanguageRegionMatch = !!(outletCountryCode && browserLanguageRegions.includes(outletCountryCode))
+  const primaryLanguageMismatch = !!(
+    primaryLangRegion &&
+    outletCountryCode &&
+    primaryLangRegion !== outletCountryCode
+  )
+  const browserLanguageListMismatch = !!(
+    outletCountryCode &&
+    browserLanguageRegions.length > 0 &&
+    !hasLanguageRegionMatch
+  )
   let languageMismatch = false
   let languageDetail = '浏览器语言未携带地区代码，无法直接比对，已跳过判断。'
-  if (langRegion && ip.countryCode) {
-    languageMismatch = langRegion !== ip.countryCode.toUpperCase()
+  if (outletCountryCode && (primaryLangRegion || browserLanguageRegions.length > 0)) {
+    languageMismatch = primaryLanguageMismatch || browserLanguageListMismatch
+    const languageListLabel = browserLanguageRegions.length > 0 ? browserLanguageRegions.join('/') : '无地区码'
     languageDetail = languageMismatch
-      ? `浏览器语言地区代码为 ${langRegion}，与 IP 归属国家（${ip.countryCode}）不一致。`
-      : `浏览器语言地区代码与 IP 归属国家一致（均为 ${ip.countryCode}）。`
+      ? `系统语言地区代码为 ${primaryLangRegion || '无地区码'}，浏览器语言列表地区代码为 ${languageListLabel}，未匹配 IP 归属国家（${outletCountryCode}）。`
+      : `浏览器语言地区代码与 IP 归属国家存在匹配（IP: ${outletCountryCode}；系统: ${primaryLangRegion || '无地区码'}；列表: ${languageListLabel}）。`
   }
   if (languageMismatch) {
     score += WEIGHTS.languageMismatch
@@ -116,21 +139,42 @@ export function evaluateRisk({ ip, browser, distinctCountriesRecently }: ScoreEv
     detail: languageDetail
   })
 
-  // 6. WebRTC 本地 IP 泄露
-  const webrtcLeak = browser.webrtcChecked && !!browser.webrtcLocalIp
-  if (webrtcLeak) {
-    score += WEIGHTS.webrtcLeak
+  // 6. WebRTC 暴露额外 IP
+  const webrtcExposure = browser.webrtcChecked && !!browser.webrtcLocalIp
+  const webrtcIpCountryCode = browser.webrtcIpInfo?.countryCode?.toUpperCase() || ''
+  const webrtcMismatch = !!(webrtcExposure && webrtcIpCountryCode && outletCountryCode && webrtcIpCountryCode !== outletCountryCode)
+
+  if (webrtcExposure) {
+    score += WEIGHTS.webrtcExposure
+  }
+  if (webrtcMismatch) {
+    score += WEIGHTS.webrtcMismatch
   }
   factors.push({
-    key: 'webrtcLeak',
-    label: 'WebRTC 泄露本地/真实 IP',
-    level: 'mid',
-    triggered: webrtcLeak,
+    key: 'webrtcExposure',
+    label: 'WebRTC 暴露额外 IP',
+    level: 'low',
+    triggered: webrtcExposure,
     detail: !browser.webrtcSupported
       ? '当前浏览器不支持 WebRTC 检测。'
-      : webrtcLeak
-      ? `检测到 WebRTC 候选地址中包含可识别 IP（${browser.webrtcLocalIp}）。`
+      : webrtcExposure
+      ? browser.webrtcIpInfo
+        ? `检测到 WebRTC 候选地址中包含可识别 IP（${browser.webrtcLocalIp}），归属地为 ${browser.webrtcIpInfo.country || '未知'}（${browser.webrtcIpInfo.countryCode || '未知'}）。`
+        : `检测到 WebRTC 候选地址中包含可识别 IP（${browser.webrtcLocalIp}），但归属地查询失败。`
       : '未通过 WebRTC 检测到额外暴露的 IP 地址。'
+  })
+  factors.push({
+    key: 'webrtcMismatch',
+    label: 'WebRTC IP 与出口 IP 国家不一致',
+    level: 'mid',
+    triggered: webrtcMismatch,
+    detail: !webrtcExposure
+      ? '未检测到 WebRTC 暴露 IP，已跳过一致性比对。'
+      : webrtcIpCountryCode && outletCountryCode
+      ? webrtcMismatch
+        ? `WebRTC IP 国家（${webrtcIpCountryCode}）与出口 IP 国家（${outletCountryCode}）不一致。`
+        : `WebRTC IP 国家与出口 IP 国家一致（均为 ${outletCountryCode}）。`
+      : 'WebRTC IP 或出口 IP 的国家信息不完整，无法完成一致性比对。'
   })
 
   const clampedScore = Math.min(100, score)

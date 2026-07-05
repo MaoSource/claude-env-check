@@ -21,6 +21,8 @@ export interface BrowserInfo {
   screenResolution: string
   devicePixelRatio: number
   webrtcLocalIp: string | null
+  webrtcIpInfo: IpInfo | null
+  webrtcIpLookupError: string | null
   webrtcChecked: boolean
   webrtcSupported: boolean
 }

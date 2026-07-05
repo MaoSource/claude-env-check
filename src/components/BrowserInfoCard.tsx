@@ -30,6 +30,11 @@ export default function BrowserInfoCard({ stage, browser, ip }: BrowserInfoCardP
       : `时区通常对应 ${implied.join('/')}，与 IP 国家不一致`
   }
 
+  const webrtcCountryCode = browser.webrtcIpInfo?.countryCode?.toUpperCase() || ''
+  const outletCountryCode = ip?.countryCode?.toUpperCase() || ''
+  const hasWebrtcMismatch = !!(browser.webrtcLocalIp && webrtcCountryCode && outletCountryCode && webrtcCountryCode !== outletCountryCode)
+  const canCompareWebrtcCountry = !!(browser.webrtcLocalIp && webrtcCountryCode && outletCountryCode)
+
   return (
     <section className="panel p-5 sm:p-6">
       <p className="eyebrow">浏览器环境</p>
@@ -61,12 +66,38 @@ export default function BrowserInfoCard({ stage, browser, ip }: BrowserInfoCardP
         </div>
         <div className="kv-row">
           <span className="kv-label">WebRTC 本地 IP 泄露</span>
-          {browser.webrtcSupported ? (
-            <StatusBadge ok={!!browser.webrtcLocalIp} trueLabel={`是（${browser.webrtcLocalIp}）`} falseLabel="否" />
+          {browser.webrtcSupported ? browser.webrtcLocalIp ? (
+            <span className="kv-value">{browser.webrtcLocalIp}</span>
+          ) : (
+            <StatusBadge ok={false} trueLabel="是" falseLabel="否" />
           ) : (
             <span className="kv-value text-ink-muted">不支持检测</span>
           )}
         </div>
+        {browser.webrtcLocalIp && (
+          <>
+            <div className="kv-row">
+              <span className="kv-label">WebRTC IP 地区</span>
+              <span className="kv-value">
+                {browser.webrtcIpInfo
+                  ? `${browser.webrtcIpInfo.country || '未知'} ${browser.webrtcIpInfo.countryCode ? `(${browser.webrtcIpInfo.countryCode})` : ''}`
+                  : browser.webrtcIpLookupError || '查询中断'}
+              </span>
+            </div>
+            <div className="kv-row">
+              <span className="kv-label">WebRTC / 出口 IP 一致性</span>
+              {canCompareWebrtcCountry ? (
+                <StatusBadge
+                  ok={hasWebrtcMismatch}
+                  trueLabel={`不一致（WebRTC ${webrtcCountryCode} / 出口 ${outletCountryCode}）`}
+                  falseLabel={`一致（${outletCountryCode}）`}
+                />
+              ) : (
+                <span className="kv-value text-ink-muted">国家信息不足，无法比对</span>
+              )}
+            </div>
+          </>
+        )}
         <div className="kv-row">
           <span className="kv-label">时区 / IP 地区一致性</span>
           <span className="kv-value">{regionNote}</span>

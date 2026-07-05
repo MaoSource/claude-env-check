@@ -17,7 +17,8 @@ const FACTOR_SUGGESTIONS: Record<string, string> = {
   countrySwitching: '近期出口国家变化较多，建议固定在一个国家/地区，减少切换频率。',
   timezoneMismatch: '系统时区与 IP 所在国家不一致，建议保持设备时区与常用出口地区匹配。',
   languageMismatch: '浏览器语言地区与 IP 所在国家不一致，可考虑调整浏览器语言设置。',
-  webrtcLeak: '检测到 WebRTC 可能暴露额外 IP 信息，如需隐藏可在浏览器中调整 WebRTC 相关设置。'
+  webrtcExposure: '检测到 WebRTC 可能暴露额外 IP 信息，可结合 WebRTC IP 地区判断是否需要调整浏览器设置。',
+  webrtcMismatch: 'WebRTC IP 与出口 IP 国家不一致，建议排查代理、IPv6、WebRTC 或系统网络路由设置。'
 }
 
 export default function SuggestionsCard({ risk }: SuggestionsCardProps) {

@@ -12,6 +12,30 @@ const LEVEL_STROKE: Record<string, string> = {
   high: '#F0555F'
 }
 
+function factorTone(factor: RiskResult['factors'][number]) {
+  if (!factor.triggered) {
+    return {
+      row: 'border-base-border bg-base-surface2/40',
+      badge: 'bg-signal-low/10 text-signal-low',
+      label: '正常'
+    }
+  }
+
+  if (factor.level === 'low') {
+    return {
+      row: 'border-signal-mid/20 bg-signal-mid/5',
+      badge: 'bg-signal-mid/15 text-signal-mid',
+      label: '提示'
+    }
+  }
+
+  return {
+    row: 'border-signal-high/20 bg-signal-high/5',
+    badge: 'bg-signal-high/15 text-signal-high',
+    label: '命中'
+  }
+}
+
 function Gauge({ score, level }: { score: number; level: 'low' | 'mid' | 'high' }) {
   const radius = 54
   const circumference = Math.PI * radius // 半圆周长
@@ -76,30 +100,26 @@ export default function RiskScoreCard({ stage, risk }: RiskScoreCardProps) {
       </div>
 
       <div className="mt-4 space-y-2">
-        {risk.factors.map((factor) => (
-          <div
-            key={factor.key}
-            className={`flex flex-col items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px] sm:flex-row sm:justify-between sm:gap-3 ${
-              factor.triggered
-                ? 'border-signal-high/20 bg-signal-high/5'
-                : 'border-base-border bg-base-surface2/40'
-            }`}
-          >
-            <div className="min-w-0">
-              <p className={factor.triggered ? 'font-medium text-ink-primary' : 'text-ink-secondary'}>
-                {factor.label}
-              </p>
-              <p className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">{factor.detail}</p>
-            </div>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-mono ${
-                factor.triggered ? 'bg-signal-high/15 text-signal-high' : 'bg-signal-low/10 text-signal-low'
-              }`}
+        {risk.factors.map((factor) => {
+          const tone = factorTone(factor)
+
+          return (
+            <div
+              key={factor.key}
+              className={`flex flex-col items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px] sm:flex-row sm:justify-between sm:gap-3 ${tone.row}`}
             >
-              {factor.triggered ? '命中' : '正常'}
-            </span>
-          </div>
-        ))}
+              <div className="min-w-0">
+                <p className={factor.triggered ? 'font-medium text-ink-primary' : 'text-ink-secondary'}>
+                  {factor.label}
+                </p>
+                <p className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">{factor.detail}</p>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-mono ${tone.badge}`}>
+                {tone.label}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </section>
   )
